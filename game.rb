@@ -1,32 +1,6 @@
 #!/usr/bin/env ruby
 
-class Player
-  @@players = [ ]
-
-  def self.inherited( player )
-    @@players << player
-  end
-
-  def self.each_pair
-    (0...(@@players.size - 1)).each do |i|
-      ((i + 1)...@@players.size).each do |j|
-        yield @@players[i], @@players[j]
-      end
-    end
-  end
-
-  def initialize( opponent )
-    @opponent = opponent
-  end
-
-  def choose
-    raise NoMethodError, "Player subclasses must override choose()."
-  end
-
-  def result( you, them, win_lose_or_draw )
-    # do nothing--sublcasses can override as needed
-  end
-end
+require './player'
 
 class Game
   def initialize( player1, player2 )
@@ -115,26 +89,4 @@ class Game
   end
 end
 
-match_game_count = 1000
-if ARGV.size > 2 and ARGV[0] == "-m" and ARGV[1] =~ /^[1-9]\d*$/
-  ARGV.shift
-  match_game_count = ARGV.shift.to_i
-end
 
-ARGV.each do |p|
-  if test(?d, p)
-    Dir.foreach(p) do |file|
-      next if file =~ /^\./
-      next unless file =~ /\.rb$/
-      require File.join(p, file)
-    end
-  else
-    require p
-  end
-end
-
-Player.each_pair do |one, two|
-  game = Game.new one, two
-  game.play match_game_count
-  puts game.results
-end
