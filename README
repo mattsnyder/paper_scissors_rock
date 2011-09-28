@@ -1,0 +1,430 @@
+This repository is intended for use with the Cleveleand Ruby Brigade's Southside meetup:
+http://www.meetup.com/ClevelandRuby/events/32731002/
+
+http://www.rubyquiz.com/quiz16.html
+
+Paper Rock Scissors (#16)
+
+Alright generals, break out you copies of "The Art of War" and let's get a little competition going!
+
+Your task is to build a strategy for playing the game of Paper Rock Scissors against all manner of opponents. The question here is if you can adapt to an opponent's strategy and seize the advantage, while he is doing the same to you of course.
+
+If you're not familiar with this childhood game, it's very simple. Both players choose one of three items at the same time: Paper, a Rock, or Scissors. A "winner" is chosen by the following rules:
+
+Paper covers a Rock. (Paper beats a Rock.)
+Scissors cut Paper. (Scissors beat Paper.)
+A Rock smashes Scissors. (A Rock beats Scissors.)
+Anything else is a "draw".
+
+Defining a player for straight forward. I'm providing a class you can just inherit from:
+ruby
+class YourPlayer < Player
+def initialize( opponent )
+# optional
+#
+# called at the start of a match verses opponent
+# opponent = String of opponent's class name
+#
+# Player's constructor sets @opponent
+end
+
+def choose
+# required
+#
+# return your choice of :paper, :rock or :scissors
+end
+
+def result( you, them, win_lose_or_draw )
+# optional
+#
+# called after each choice you make to give feedback
+# you = your choice
+# them = opponent's choice
+# win_lose_or_draw = :win, :lose or :draw, your result
+end
+end
+
+We'll need some rules for defining players, to make it easy for all our strategies to play against each other:
+
+* send in one file for each strategy
+* a file should contain exactly one subclass of Player
+* start the name of your subclass with your initials
+* start the name of your files with your initials
+* start any data files you write to disk with your initials
+
+Those rules should help with testing how different algorithms perform against each other.
+
+Here are two dumb Players to practice with:
+ruby
+class JEGPaperPlayer < Player
+def choose
+:paper
+end
+end
+
+ruby
+class JEGQueuePlayer < Player
+QUEUE = [ :rock,
+:scissors,
+:scissors ]
+
+def initialize( opponent )
+super
+
+@index = 0
+end
+
+def choose
+choice = QUEUE[@index]
+
+@index += 1
+@index = 0 if @index == QUEUE.size
+
+choice
+end
+end
+
+Here's how those two do against each other in a 1,000 game match:
+
+JEGPaperPlayer vs. JEGQueuePlayer JEGPaperPlayer: 334 JEGQueuePlayer: 666 JEGQueuePlayer Wins
+
+Finally, here's the game engine that supports the players:
+ruby
+#!/usr/bin/env ruby
+
+class Player
+@@players = [ ]
+
+def self.inherited( player )
+@@players << player
+end
+
+def self.each_pair
+(0...(@@players.size - 1)).each do |i|
+((i + 1)...@@players.size).each do |j|
+yield @@players[i], @@players[j]
+end
+end
+end
+
+def initialize( opponent )
+@opponent = opponent
+end
+
+def choose
+raise NoMethodError, "Player subclasses must override choose()."
+end
+
+def result( you, them, win_lose_or_draw )
+# do nothing--sublcasses can override as needed
+end
+end
+
+class Game
+def initialize( player1, player2 )
+@player1 = player1.new(player2.to_s)
+@player2 = player2.new(player1.to_s)
+@score1 = 0
+@score2 = 0
+end
+
+def play( match )
+match.times do
+hand1 = @player1.choose
+hand2 = @player2.choose
+case hand1
+when :paper
+case hand2
+when :paper
+draw hand1, hand2
+when :rock
+win @player1, hand1, hand2
+when :scissors
+win @player2, hand1, hand2
+else
+raise "Invalid choice by #{@player2.class}."
+end
+when :rock
+case hand2
+when :paper
+win @player2, hand1, hand2
+when :rock
+draw hand1, hand2
+when :scissors
+win @player1, hand1, hand2
+else
+raise "Invalid choice by #{@player2.class}."
+end
+when :scissors
+case hand2
+when :paper
+win @player1, hand1, hand2
+when :rock
+win @player2, hand1, hand2
+when :scissors
+draw hand1, hand2
+else
+raise "Invalid choice by #{@player2.class}."
+end
+else
+raise "Invalid choice by #{@player1.class}."
+end
+end
+end
+
+def results
+match = "#{@player1.class} vs. #{@player2.class}\n" +
+"\t#{@player1.class}: #{@score1}\n" +
+"\t#{@player2.class}: #{@score2}\n"
+if @score1 == @score2
+match + "\tDraw\n"
+elsif @score1 > @score2
+match + "\t#{@player1.class} Wins\n"
+else
+match + "\t#{@player2.class} Wins\n"
+end
+end
+
+private
+
+def draw( hand1, hand2 )
+@score1 += 0.5
+@score2 += 0.5
+@player1.result(hand1, hand2, :draw)
+@player2.result(hand2, hand1, :draw)
+end
+
+def win( winner, hand1, hand2 )
+if winner == @player1
+@score1 += 1
+@player1.result(hand1, hand2, :win)
+@player2.result(hand2, hand1, :lose)
+else
+@score2 += 1
+@player1.result(hand1, hand2, :lose)
+@player2.result(hand2, hand1, :win)
+end
+end
+end
+
+match_game_count = 1000
+if ARGV.size > 2 and ARGV[0] == "-m" and ARGV[1] =~ /^[1-9]\d*$/
+ARGV.shift
+match_game_count = ARGV.shift.to_i
+end
+
+ARGV.each do |p|
+if test(?d, p)
+Dir.foreach(p) do |file|
+next if file =~ /^\./
+next unless file =~ /\.rb$/
+require File.join(p, file)
+end
+else
+require p
+end
+end
+
+Player.each_pair do |one, two|
+game = Game.new one, two
+game.play match_game_count
+puts game.results
+end
+
+To use:
+
+paper_rock_scissors.rb jeg_paper_player.rb jeg_queue_player.rb
+
+Or you can point it at a directory and it will treat all the ".rb" files in there as Players:
+
+paper_rock_scissors.rb players/
+
+You can also change the match game count:
+
+paper_rock_scissors.rb -m 10000 players/
+
+Quiz Summary
+
+This week's quiz is a classic computer science problem in disguise. It's generally done with the Prisoner's Dilemma:
+
+Prisoner's Dilemma
+
+The game chosen doesn't much matter, but the idea is that there really shouldn't be much strategy involved. In the Prisoner's Dilemma, it's generally agreed that it's hard to beat a player that confesses every time. For the game of Paper Rock Scissors, the winning strategy is to be purely random, as Benedikt Huber explained on Ruby Talk:
+
+You can't give any predictions on the next move of a random player.
+Therefore you have a 1/3 prop. to choose a winning, losing
+or drawing move.
+
+To be fair, Paper Rock Scissors does have quite a bit of strategy theory these days, but the conditions of that theory (mostly body language) are unavailable to computer players. Entire books have been written on the subject, believe it or not:
+
+The Official Rock Paper Scissors Strategy Guide
+
+So random is the best we can do? Is that hard to build? Uh, no. Here's a sample by Avi Bryant:
+ruby
+class AJBRandomPlayer < Player
+def choose
+[:paper, :scissors, :rock][rand(3)]
+end
+end
+
+If we test that, we get the expected 50/50 results:
+
+AJBRandomPlayer vs. JEGPaperPlayer
+AJBRandomPlayer: 511.0
+JEGPaperPlayer: 489.0
+AJBRandomPlayer Wins
+AJBRandomPlayer vs. JEGQueuePlayer
+AJBRandomPlayer: 499.5
+JEGQueuePlayer: 500.5
+JEGQueuePlayer Wins
+
+Of course, that's so uninteresting, we're probably beginning to wonder if James's quiz selecting skills are on the fritz. Possibly, but interesting solutions make me look good none-the-less. This week, Christian Neukirchen sent in more than one of those:
+
+CNBiasInverter: Choose so that your bias will be the inverted
+opponent's bias.
+
+CNIrrflug: Pick a random choice. If you win, use it again; else,
+use a random choice.
+
+CNStepAhead: Try to think a step ahead. If you win, use the choice
+where you'd have lost. If you lose, you the choice where you'd
+have won. Use the same on draw.
+
+CNBiasFlipper: Always use the choice that hits what the opponent
+said most or second-to-most often (if the most often choice is not
+absolutely prefered).
+
+CNBiasBreaker: Always use the choice that hits what the opponent
+said most often.
+
+CNMeanPlayer: Pick a random choice. If you win, use it again; else,
+use the opponent's choice.
+
+I really should show all of those here, but that would make for a ridiculously large summary. Let's go with Christian's favorite:
+ruby
+class CNBiasInverter < Player
+def initialize(opponent)
+super
+@biases = {:rock => 0, :scissors => 0, :paper => 0}
+@hit = {:rock => :paper, :paper => :scissors, :scissors => :rock}
+end
+
+def choose
+n = ::Kernel.rand(@biases[:rock] + @biases[:scissors] +
+@biases[:paper]).to_i
+case n
+when 0..@biases[:rock]
+:paper
+when @biases[:rock]..@biases[:rock]+@biases[:scissors]
+:rock
+when @biases[:rock]+@biases[:scissors]..@biases[:rock]+
+@biases[:scissors]+@biases[:paper]
+:scissors
+else
+p @biases[:rock]+@biases[:scissors]..@biases[:paper]
+abort n.to_s
+end
+end
+
+def result( you, them, win_lose_or_draw )
+@biases[them] += 1
+end
+end
+
+initialize() sets up the a Hash for tracking the biases. (I don't believe @hit is needed.) result() is the compliment to that. It adjusts the proper bias count each time the opponent makes a selection.
+
+choose() does all the interesting work. A random number is chosen between 0 and the total of all the bias counts. That number is then associated with the indicated bias by some clever use of ranges and the opposite of that bias is returned as CNBiasInverter's choice.
+
+In other words, as the opponent chooses more and more of a particular item, the bias count for that item climbs. This will cause the semi-random choice to drift towards the opposite of that favored move.
+
+Let's compare with our baseline:
+
+CNBiasInverter vs. JEGPaperPlayer
+CNBiasInverter: 995.0
+JEGPaperPlayer: 5.0
+CNBiasInverter Wins
+CNBiasInverter vs. JEGQueuePlayer
+CNBiasInverter: 653.5
+JEGQueuePlayer: 346.5
+CNBiasInverter Wins
+
+The results are getting better. But, of course, random is still trump:
+
+AJBRandomPlayer vs. CNBiasInverter
+AJBRandomPlayer: 509.5
+CNBiasInverter: 490.5
+AJBRandomPlayer Wins
+
+There were many, many interesting strategies, like the one above. But random remained the great equalizer. Which leads us to the critical question: What exactly is the point of this exercise?
+
+Cheating, of course!
+
+With the Prisoner's Dilemma and this quiz, it's common the engineer the environment to be ripe for cheating. Since there's no winning strategy available, we'll need to bend the rules a little bit. That's because programmers have enormous egos and can't stand to lose at anything!
+
+(Note: Technically, no one even cheated. The definition of cheat that applies here is, "to violate rules dishonestly." Go back and reread the quiz, if you need to...)
+
+What's the ultimate cheat? Well, here's the first by Bill Atkins:
+ruby
+class BACheater < Player
+def initialize opponent
+Object.const_get(opponent).send :define_method, :choose do
+:paper
+end
+end
+
+def choose
+:scissors
+end
+end
+
+It doesn't get much simpler than that! Bill's initialize() method uses the passed in name of the opponent to locate the correct Class object and redefine the choose() method of that Class to something super easy to deal with. The opponent is modified to always throw :paper and BACheater always throws :scissors.
+
+That's 100% successful against anything we've seen thus far. Worse, you're player is permanently modified when it goes up against BACheater, leaving you vulnerable to clever strategies like CNBiasInverter above:
+
+AJBRandomPlayer vs. BACheater
+AJBRandomPlayer: 0
+BACheater: 1000
+BACheater Wins
+AJBRandomPlayer vs. CNBiasInverter
+AJBRandomPlayer: 4.5
+CNBiasInverter: 995.5
+CNBiasInverter Wins
+BACheater vs. CNBiasInverter
+BACheater: 1000
+CNBiasInverter: 0
+BACheater Wins
+
+Ouch!
+
+Another cheat used by more than one player was to try and predict an opponent's move, then respond with a counter. Here is Benedikt Huber's version:
+ruby
+KILLER = { :rock => :paper,
+:paper => :scissors,
+:scissors => :rock }
+
+class BHCheatPlayer < Player
+
+def initialize( opponent )
+super
+@opp = Object.const_get(opponent).new(self)
+end
+
+def choose
+KILLER[@opp.choose]
+end
+
+def result(you,them,result)
+@opp.result(them,you,result)
+end
+
+end
+
+Again initialize() retrieves the Class object, but instead of modifying the Class, it simply creates an internal copy of the opponent. result() forwards each pick to the copied opponent, to keep it synchronized with the real opponent. From there, choose() is obvious: See what the opponent is about to do and counter.
+
+It was pointed out on Ruby Talk that this doesn't demolish random players; however, against any random strategy, this becomes a random player. Countering a random choice is a still a random move, even if the choice isn't what the opponent is about to do.
+
+There were other great cheats. Jannis Harder's self-repairing program and FGSpyPlayer (well commented) are both worth studying. Some cheating approaches were also overlooked. For example, no one tried to modify the score, but it can be done. There were also a lot of excellent non-cheating solutions. Which leaves me with no choice but to say the lame but utterly true, "All the submissions are worth a look!"
+
+My thanks to all my fellow cheaters and the rule abiding players that tolerate our antics.
+
+Tomorrow's quiz was an actual job project of mine, years ago...
