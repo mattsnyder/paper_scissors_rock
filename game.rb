@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 
 require './player'
+require './rock_paper_scissors_rules'
+require 'ostruct'
 
 class Game
   def initialize( player1, player2 )
@@ -14,47 +16,21 @@ class Game
     match.times do
       hand1 = @player1.choose
       hand2 = @player2.choose
-      case hand1
-      when :paper
-        case hand2
-        when :paper
-          draw hand1, hand2
-        when :rock
-          win @player1, hand1, hand2
-        when :scissors
-          win @player2, hand1, hand2
-        else
-          raise "Invalid choice by #{@player2.class}."
-        end
-      when :rock
-        case hand2
-        when :paper
-          win @player2, hand1, hand2
-        when :rock
-          draw hand1, hand2
-        when :scissors
-          win @player1, hand1, hand2
-        else
-          raise "Invalid choice by #{@player2.class}."
-        end
-      when :scissors
-        case hand2
-        when :paper
-          win @player1, hand1, hand2
-        when :rock
-          win @player2, hand1, hand2
-        when :scissors
-          draw hand1, hand2
-        else
-          raise "Invalid choice by #{@player2.class}."
-        end
-      else
-        raise "Invalid choice by #{@player1.class}."
-      end
+      rules = RockPaperScissorsRules.new
+      winner = rules.play hand1, hand2
+      @player1.winning_token winner
+      @player2.winning_token winner
     end
   end
 
   def results
+    OpenStruct.new({
+                     :draw? => @score1 == @score2,
+                     :winner => @score1 > @score2 ? @player1 : @player2
+                   })
+  end
+    
+  def results_old
     match = "#{@player1.class} vs. #{@player2.class}\n" +
       "\t#{@player1.class}: #{@score1}\n" +
       "\t#{@player2.class}: #{@score2}\n"

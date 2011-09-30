@@ -9,6 +9,8 @@ GEM
     rspec-core (2.6.4)
     rspec-expectations (2.6.0)
       diff-lcs (~> 1.1.2)
+    rspec-given (1.4.0)
+      rspec (> 1.2.8)
     rspec-mocks (2.6.0)
 
 PLATFORMS
@@ -16,3 +18,4 @@ PLATFORMS
 
 DEPENDENCIES
   rspec
+  rspec-given
